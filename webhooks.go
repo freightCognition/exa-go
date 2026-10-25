@@ -156,6 +156,9 @@ func VerifyWebhook(payload []byte, header, secret string, tolerance time.Duratio
 	if err != nil || len(sigs) == 0 {
 		return ErrWebhookMalformedHeader
 	}
+	if tolerance < 0 { // only 0 turns the replay check off
+		tolerance = -tolerance
+	}
 	if tolerance > 0 {
 		if d := time.Since(time.Unix(unix, 0)); d > tolerance || d < -tolerance {
 			return ErrWebhookTimestampOutOfTolerance

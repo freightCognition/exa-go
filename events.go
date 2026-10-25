@@ -57,9 +57,23 @@ var eventData = map[EventType]string{
 	EventMonitorRunCreated: "MonitorRun", EventMonitorRunCompleted: "MonitorRun",
 }
 
+// eventObject is the "object" value each accessor's payload carries.
+var eventObject = map[string]string{
+	"Webset": "webset", "Item": "webset_item", "Search": "webset_search",
+	"Import": "import", "Monitor": "monitor", "MonitorRun": "monitor_run",
+}
+
 func eventAs[T any](e Event, kind string) (*T, error) {
 	if eventData[e.Type] != kind {
 		return nil, fmt.Errorf("exa: event %s carries no %s", e.Type, kind)
+	}
+	// Search Monitor webhooks reuse the monitor.* names with other payloads;
+	// Websets payloads always name their object.
+	var probe struct {
+		Object string `json:"object"`
+	}
+	if err := json.Unmarshal(e.Data, &probe); err != nil || probe.Object != eventObject[kind] {
+		return nil, fmt.Errorf("exa: event %s data is %q, not a Websets %s", e.Type, probe.Object, eventObject[kind])
 	}
 	var out T
 	if err := json.Unmarshal(e.Data, &out); err != nil {

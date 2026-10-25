@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"mime"
 	"net/http"
 	"net/url"
 	"strings"
@@ -91,6 +92,13 @@ func stream[T any](ctx context.Context, c *Client, method, base, path string, qu
 			return
 		}
 		defer resp.Body.Close()
+		// A JSON reply (server or proxy ignored Accept) has no data lines and
+		// would look like an empty, successful stream.
+		if mt, _, _ := mime.ParseMediaType(resp.Header.Get("Content-Type")); mt != "text/event-stream" {
+			b, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+			yield(zero, fmt.Errorf("exa: %s: expected an event stream, got %q: %s", path, mt, strings.TrimSpace(string(b))))
+			return
+		}
 		r := newSSEReader(resp.Body)
 		for {
 			ev, err := r.next()

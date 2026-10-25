@@ -65,8 +65,9 @@ type CreateImportResponse struct {
 	Import
 	// UploadURL takes the file; pass it to Upload.
 	UploadURL string `json:"uploadUrl"`
-	// UploadValidUntil is when UploadURL expires (an hour after creation).
-	UploadValidUntil time.Time `json:"uploadValidUntil"`
+	// UploadValidUntil is when UploadURL expires (about an hour after
+	// creation), as the API sent it; the spec types it only as a string.
+	UploadValidUntil string `json:"uploadValidUntil"`
 }
 
 // CreateImportParameters create a CSV import.
@@ -127,19 +128,29 @@ func (s *WebsetImportsService) Delete(ctx context.Context, id string) (*Import, 
 // known length, so pass a *bytes.Reader, *strings.Reader, *bytes.Buffer or
 // any io.Seeker such as an *os.File; other readers are sent chunked, which
 // the storage service may refuse. A non-2xx answer is an *APIError.
+// Upload does not close r.
 func (s *WebsetImportsService) Upload(ctx context.Context, uploadURL string, r io.Reader) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, r)
+	size := int64(-1)
+	switch v := r.(type) {
+	case interface{ Len() int }:
+		size = int64(v.Len())
+	case io.Seeker:
+		cur, err1 := v.Seek(0, io.SeekCurrent)
+		end, err2 := v.Seek(0, io.SeekEnd)
+		if _, err3 := v.Seek(cur, io.SeekStart); err1 == nil && err2 == nil && err3 == nil {
+			size = end - cur
+		}
+	}
+	// NopCloser: the transport closes request bodies, and r is the caller's.
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, io.NopCloser(r))
 	if err != nil {
 		return fmt.Errorf("exa: build upload request: %w", err)
 	}
-	if req.ContentLength == 0 {
-		if sk, ok := r.(io.Seeker); ok {
-			cur, err1 := sk.Seek(0, io.SeekCurrent)
-			end, err2 := sk.Seek(0, io.SeekEnd)
-			if _, err3 := sk.Seek(cur, io.SeekStart); err1 == nil && err2 == nil && err3 == nil {
-				req.ContentLength = end - cur
-			}
-		}
+	switch {
+	case size == 0:
+		req.Body = http.NoBody
+	case size > 0:
+		req.ContentLength = size
 	}
 	req.Header.Set("Content-Type", "text/csv")
 	req.Header.Set("User-Agent", s.c.userAgent)

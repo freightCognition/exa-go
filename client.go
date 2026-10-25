@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"reflect"
 	"strings"
 )
 
@@ -100,6 +101,16 @@ func withHeader(key, value string) func(*http.Request) {
 
 // newRequest builds an authenticated request. body is JSON-encoded when non-nil.
 func (c *Client) newRequest(ctx context.Context, method, base, path string, query url.Values, body any) (*http.Request, error) {
+	// An empty ID leaves "/runs/" or "//items": refuse it rather than hit
+	// the collection endpoint and decode a list as one resource.
+	if strings.HasSuffix(path, "/") || strings.Contains(path, "//") {
+		return nil, fmt.Errorf("exa: empty ID in request path %q", path)
+	}
+	// A typed nil request (e.g. (*CreateAgentRunRequest)(nil)) sends no body,
+	// not the JSON null.
+	if v := reflect.ValueOf(body); body != nil && v.Kind() == reflect.Pointer && v.IsNil() {
+		body = nil
+	}
 	u := base + path
 	if len(query) > 0 {
 		u += "?" + query.Encode()
@@ -132,6 +143,14 @@ func (c *Client) send(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		if ctxErr := req.Context().Err(); ctxErr != nil {
 			return nil, ctxErr
+		}
+		// Drop the query from the error: on presigned URLs it is the credential.
+		var ue *url.Error
+		if errors.As(err, &ue) {
+			if u, perr := url.Parse(ue.URL); perr == nil && u.RawQuery != "" {
+				u.RawQuery = ""
+				ue.URL = u.String()
+			}
 		}
 		return nil, fmt.Errorf("exa: %s %s: %w", req.Method, req.URL.Path, err)
 	}

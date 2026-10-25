@@ -203,6 +203,26 @@ func (e AgentRunEvent) Run() (*AgentRun, error) {
 	return &r, nil
 }
 
+// Failure returns the error carried by a failed run's event (the run object
+// has no error field), or nil when there is none.
+func (e AgentRunEvent) Failure() *AgentError {
+	var p struct {
+		Error json.RawMessage `json:"error"`
+	}
+	if json.Unmarshal(e.Data, &p) != nil || len(p.Error) == 0 || string(p.Error) == "null" {
+		return nil
+	}
+	var ae AgentError
+	if json.Unmarshal(p.Error, &ae) == nil {
+		return &ae
+	}
+	var msg string
+	if json.Unmarshal(p.Error, &msg) == nil {
+		return &AgentError{Message: msg}
+	}
+	return nil
+}
+
 func (r *CreateAgentRunRequest) edits() []func(*http.Request) {
 	if r == nil || r.Beta == "" {
 		return nil

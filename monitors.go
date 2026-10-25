@@ -31,6 +31,32 @@ type UpdateSearchMonitorParameters struct {
 	OutputSchema *OutputSchema         `json:"outputSchema,omitempty"`
 	Metadata     map[string]string     `json:"metadata,omitempty"`
 	Webhook      *SearchMonitorWebhook `json:"webhook,omitempty"`
+
+	// The Clear fields send null, removing the value; each overrides its
+	// field above. ClearTrigger leaves the monitor running only on Trigger.
+	ClearName         bool `json:"-"`
+	ClearTrigger      bool `json:"-"`
+	ClearOutputSchema bool `json:"-"`
+	ClearMetadata     bool `json:"-"`
+}
+
+// MarshalJSON sends null for each set Clear field.
+func (p UpdateSearchMonitorParameters) MarshalJSON() ([]byte, error) {
+	type plain UpdateSearchMonitorParameters
+	b, err := json.Marshal(plain(p))
+	if err != nil || !(p.ClearName || p.ClearTrigger || p.ClearOutputSchema || p.ClearMetadata) {
+		return b, err
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	for key, clear := range map[string]bool{"name": p.ClearName, "trigger": p.ClearTrigger, "outputSchema": p.ClearOutputSchema, "metadata": p.ClearMetadata} {
+		if clear {
+			m[key] = json.RawMessage("null")
+		}
+	}
+	return json.Marshal(m)
 }
 
 // SearchMonitorSearch is the search a monitor runs.
@@ -66,7 +92,7 @@ type SearchMonitorContents struct {
 	// Deprecated: number of subpages to crawl per result.
 	Subpages *int `json:"subpages,omitempty"`
 	// Deprecated: terms to find specific subpages.
-	SubpageTarget []string `json:"subpageTarget,omitempty"`
+	SubpageTarget Strings `json:"subpageTarget,omitempty"`
 }
 
 // SummaryWithMaxTokensOptions requests an LLM summary of each result. An

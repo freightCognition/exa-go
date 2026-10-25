@@ -36,7 +36,7 @@ func TestWebsetImports(t *testing.T) {
 	rec.expect(t, http.MethodPost, "/websets/v0/imports",
 		`{"size":2048,"count":120,"title":"Q4 leads","format":"csv","metadata":{"src":"crm"},"entity":{"type":"company"},"csv":{"identifier":0}}`)
 	if res.ID != "imp_1" || res.Status != ImportStatusPending || res.Format != ImportFormatCSV || res.Count != 120 ||
-		res.Entity == nil || res.UploadURL != "https://s3.example/put?sig=1" || !res.UploadValidUntil.Equal(mustTime(t, "2026-10-01T01:00:00Z")) {
+		res.Entity == nil || res.UploadURL != "https://s3.example/put?sig=1" || res.UploadValidUntil != "2026-10-01T01:00:00Z" {
 		t.Errorf("import = %+v", res)
 	}
 

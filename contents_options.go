@@ -3,6 +3,7 @@ package exa
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"reflect"
 )
 
@@ -34,7 +35,7 @@ type ContentsOptions struct {
 	// Deprecated: number of subpages to crawl per result.
 	Subpages *int `json:"subpages,omitempty"`
 	// Deprecated: terms to find specific subpages.
-	SubpageTarget []string `json:"subpageTarget,omitempty"`
+	SubpageTarget Strings `json:"subpageTarget,omitempty"`
 }
 
 // TextOptions controls full-text extraction. An empty struct sends true.
@@ -246,4 +247,25 @@ type ContentsCost struct {
 	Text       float64 `json:"text,omitempty"`
 	Highlights float64 `json:"highlights,omitempty"`
 	Summary    float64 `json:"summary,omitempty"`
+}
+
+// Strings is a list of strings that the API may also send as one string.
+type Strings []string
+
+// UnmarshalJSON accepts "a" or ["a", "b"].
+func (s *Strings) UnmarshalJSON(b []byte) error {
+	if string(bytes.TrimSpace(b)) == "null" {
+		return nil
+	}
+	var one string
+	if json.Unmarshal(b, &one) == nil {
+		*s = Strings{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(b, &many); err != nil {
+		return fmt.Errorf("exa: want a string or a list of strings: %w", err)
+	}
+	*s = many
+	return nil
 }
