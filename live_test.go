@@ -32,10 +32,10 @@ func liveClient(t *testing.T) *Client {
 }
 
 // liveCall sends one request and decodes the body strictly into out.
-func liveCall(t *testing.T, c *Client, method, base, path string, body, out any) {
+func liveCall(t *testing.T, c *Client, method, base, path string, body, out any, edits ...func(*http.Request)) {
 	t.Helper()
 	var raw json.RawMessage
-	if err := c.do(context.Background(), method, base, path, nil, body, &raw); err != nil {
+	if err := c.do(context.Background(), method, base, path, nil, body, &raw, edits...); err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
 	}
 	dec := json.NewDecoder(bytes.NewReader(raw))
@@ -139,4 +139,14 @@ func TestLiveBadKey(t *testing.T) {
 	if apiErr.Message == "" {
 		t.Errorf("401 decoded without a message: %+v", apiErr)
 	}
+}
+
+// Read-only list calls across every API area (no credits spent beyond auth).
+func TestLiveListEndpoints(t *testing.T) {
+	c := liveClient(t)
+	liveCall(t, c, http.MethodGet, c.baseURL, "/agent/runs?limit=2", nil, &Page[AgentRun]{})
+	liveCall(t, c, http.MethodGet, c.baseURL, "/batches?limit=2", nil, &Page[Batch]{}, withHeader("Exa-Beta", batchesBeta))
+	liveCall(t, c, http.MethodGet, c.baseURL, "/monitors?limit=2", nil, &Page[SearchMonitor]{})
+	liveCall(t, c, http.MethodGet, c.baseURL, "/websets/v0/websets?limit=2", nil, &Page[Webset]{})
+	liveCall(t, c, http.MethodGet, c.baseURL, "/websets/v0/teams/me", nil, &TeamInfo{})
 }
