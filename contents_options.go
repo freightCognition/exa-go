@@ -1,6 +1,7 @@
 package exa
 
 import (
+	"bytes"
 	"encoding/json"
 	"reflect"
 )
@@ -38,6 +39,7 @@ type ContentsOptions struct {
 
 // TextOptions controls full-text extraction. An empty struct sends true.
 type TextOptions struct {
+	toggle
 	MaxCharacters   *int          `json:"maxCharacters,omitempty"`
 	IncludeHTMLTags *bool         `json:"includeHtmlTags,omitempty"`
 	Verbosity       TextVerbosity `json:"verbosity,omitempty"`
@@ -48,6 +50,7 @@ type TextOptions struct {
 // HighlightsOptions steers highlight extraction. An empty struct sends true,
 // which Exa recommends for the best default.
 type HighlightsOptions struct {
+	toggle
 	Query     string              `json:"query,omitempty"`
 	Verbosity HighlightsVerbosity `json:"verbosity,omitempty"`
 	// Dynamic requires the dynamic-highlights beta.
@@ -62,6 +65,7 @@ type HighlightsOptions struct {
 
 // SummaryOptions requests an LLM summary of each page. An empty struct sends true.
 type SummaryOptions struct {
+	toggle
 	Query string `json:"query,omitempty"`
 	// Schema is a JSON Schema for a structured summary.
 	Schema map[string]any `json:"schema,omitempty"`
@@ -69,6 +73,7 @@ type SummaryOptions struct {
 
 // ContextOptions is the deprecated combined-context option. An empty struct sends true.
 type ContextOptions struct {
+	toggle
 	MaxCharacters *int `json:"maxCharacters,omitempty"`
 }
 
@@ -85,22 +90,72 @@ type ExtrasOptions struct {
 
 func (o TextOptions) MarshalJSON() ([]byte, error) {
 	type plain TextOptions
-	return trueWhenEmpty(plain(o))
+	return marshalToggle(o.off, plain(o))
+}
+
+func (o *TextOptions) UnmarshalJSON(b []byte) error {
+	type plain TextOptions
+	return unmarshalToggle(b, (*plain)(o), &o.toggle)
 }
 
 func (o HighlightsOptions) MarshalJSON() ([]byte, error) {
 	type plain HighlightsOptions
-	return trueWhenEmpty(plain(o))
+	return marshalToggle(o.off, plain(o))
+}
+
+func (o *HighlightsOptions) UnmarshalJSON(b []byte) error {
+	type plain HighlightsOptions
+	return unmarshalToggle(b, (*plain)(o), &o.toggle)
 }
 
 func (o SummaryOptions) MarshalJSON() ([]byte, error) {
 	type plain SummaryOptions
-	return trueWhenEmpty(plain(o))
+	return marshalToggle(o.off, plain(o))
+}
+
+func (o *SummaryOptions) UnmarshalJSON(b []byte) error {
+	type plain SummaryOptions
+	return unmarshalToggle(b, (*plain)(o), &o.toggle)
 }
 
 func (o ContextOptions) MarshalJSON() ([]byte, error) {
 	type plain ContextOptions
-	return trueWhenEmpty(plain(o))
+	return marshalToggle(o.off, plain(o))
+}
+
+func (o *ContextOptions) UnmarshalJSON(b []byte) error {
+	type plain ContextOptions
+	return unmarshalToggle(b, (*plain)(o), &o.toggle)
+}
+
+// toggle is embedded in options the API takes as true, false or an object.
+// It records a decoded false so the value re-encodes as false.
+type toggle struct{ off bool }
+
+// acceptsBool marks the type for the spec tests: it decodes itself but its
+// fields still map one to one onto the spec.
+func (toggle) acceptsBool() {}
+
+func marshalToggle(off bool, plain any) ([]byte, error) {
+	if off {
+		return []byte("false"), nil
+	}
+	return trueWhenEmpty(plain)
+}
+
+// unmarshalToggle decodes true (defaults), false (off) or an object into p.
+// p must not have its own UnmarshalJSON; t is the toggle inside *p.
+func unmarshalToggle[P any](b []byte, p *P, t *toggle) error {
+	var zero P
+	*p = zero
+	switch string(bytes.TrimSpace(b)) {
+	case "true":
+		return nil
+	case "false":
+		t.off = true
+		return nil
+	}
+	return json.Unmarshal(b, p)
 }
 
 // trueWhenEmpty encodes a zero struct as true (the API's "use defaults") and

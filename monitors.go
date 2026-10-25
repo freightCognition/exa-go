@@ -47,9 +47,6 @@ type SearchMonitorSearch struct {
 // SearchMonitorContents chooses the page content each run returns. It is
 // ContentsOptions without SnapshotAsOf/CrawledBeforeDate, with a different
 // Summary and with FilterEmptyResults.
-//
-// Text, Highlights, Summary and Context send true for a pointer to an empty
-// struct. Decoding turns true into an empty struct and false into nil.
 type SearchMonitorContents struct {
 	Text       *TextOptions                 `json:"text,omitempty"`
 	Highlights *HighlightsOptions           `json:"highlights,omitempty"`
@@ -72,34 +69,10 @@ type SearchMonitorContents struct {
 	SubpageTarget []string `json:"subpageTarget,omitempty"`
 }
 
-// searchMonitorContentsFields is SearchMonitorContents without its methods.
-type searchMonitorContentsFields SearchMonitorContents
-
-// UnmarshalJSON accepts true/false for the options that take "true or an
-// object", as the API echoes them back.
-func (o *SearchMonitorContents) UnmarshalJSON(b []byte) error {
-	var raw map[string]json.RawMessage
-	if err := json.Unmarshal(b, &raw); err != nil {
-		return err
-	}
-	for _, k := range [...]string{"text", "highlights", "summary", "context"} {
-		switch string(raw[k]) {
-		case "true":
-			raw[k] = json.RawMessage(`{}`)
-		case "false":
-			delete(raw, k)
-		}
-	}
-	b, err := json.Marshal(raw)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(b, (*searchMonitorContentsFields)(o))
-}
-
 // SummaryWithMaxTokensOptions requests an LLM summary of each result. An
 // empty struct sends true.
 type SummaryWithMaxTokensOptions struct {
+	toggle
 	Query string `json:"query,omitempty"`
 	// Deprecated: no longer used.
 	MaxTokens *int `json:"maxTokens,omitempty"`
@@ -108,7 +81,13 @@ type SummaryWithMaxTokensOptions struct {
 // MarshalJSON sends true for an empty struct.
 func (o SummaryWithMaxTokensOptions) MarshalJSON() ([]byte, error) {
 	type plain SummaryWithMaxTokensOptions
-	return trueWhenEmpty(plain(o))
+	return marshalToggle(o.off, plain(o))
+}
+
+// UnmarshalJSON accepts true, false or an object.
+func (o *SummaryWithMaxTokensOptions) UnmarshalJSON(b []byte) error {
+	type plain SummaryWithMaxTokensOptions
+	return unmarshalToggle(b, (*plain)(o), &o.toggle)
 }
 
 // SearchMonitorTrigger schedules a monitor.

@@ -49,10 +49,8 @@ func init() {
 	registerSchema("SearchMonitor", SearchMonitor{})
 	registerSchema("SearchMonitorSearch", SearchMonitorSearch{})
 	registerSchema("SearchMonitorSearchOutput", SearchMonitorSearch{})
-	// SearchMonitorContents decodes itself, which hides its fields from the
-	// nested comparison; the methodless twin is compared field by field here.
-	registerSchema("SearchMonitorContents", searchMonitorContentsFields{})
-	registerSchema("SearchMonitorContentsOutput", searchMonitorContentsFields{})
+	registerSchema("SearchMonitorContents", SearchMonitorContents{})
+	registerSchema("SearchMonitorContentsOutput", SearchMonitorContents{})
 	registerSchema("SummaryWithMaxTokensOptions", SummaryWithMaxTokensOptions{})
 	registerSchema("SummaryWithMaxTokensOptionsOutput", SummaryWithMaxTokensOptions{})
 	registerSchema("SearchMonitorTrigger", SearchMonitorTrigger{})

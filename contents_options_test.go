@@ -57,6 +57,39 @@ func TestIncludeHTMLTagsFalseIsAnObject(t *testing.T) {
 	}
 }
 
+// Responses (e.g. a Search Monitor's saved contents) echo these options back
+// as true, false or an object; all three must decode and re-encode unchanged.
+func TestOptionsRoundTripTrueFalseAndObjects(t *testing.T) {
+	in := `{"text":true,"highlights":{"query":"pricing"},"summary":false,"context":{"maxCharacters":10}}`
+	var o ContentsOptions
+	if err := json.Unmarshal([]byte(in), &o); err != nil {
+		t.Fatal(err)
+	}
+	if o.Text == nil || o.Highlights == nil || o.Highlights.Query != "pricing" || o.Summary == nil || o.Context == nil {
+		t.Fatalf("decoded = %+v", o)
+	}
+	if got := marshal(t, o); got != in {
+		t.Fatalf("round trip\n got  %s\n want %s", got, in)
+	}
+}
+
+func TestMonitorContentsDecodeTrue(t *testing.T) {
+	var m SearchMonitorContents
+	if err := json.Unmarshal([]byte(`{"text":true,"summary":{"query":"q"},"highlights":false}`), &m); err != nil {
+		t.Fatal(err)
+	}
+	if got := marshal(t, m); got != `{"text":true,"highlights":false,"summary":{"query":"q"}}` {
+		t.Fatalf("got %s", got)
+	}
+}
+
+func TestOptionsRejectGarbage(t *testing.T) {
+	var o TextOptions
+	if err := json.Unmarshal([]byte(`"yes"`), &o); err == nil {
+		t.Fatal("expected an error for a string")
+	}
+}
+
 func TestOutputSchema(t *testing.T) {
 	if got := marshal(t, OutputSchema{Type: OutputSchemaTypeText, Description: "one paragraph"}); got != `{"type":"text","description":"one paragraph"}` {
 		t.Errorf("text schema = %s", got)

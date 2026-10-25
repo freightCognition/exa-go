@@ -102,14 +102,14 @@ func TestSearchMonitorContentsBooleans(t *testing.T) {
 	if err := json.Unmarshal([]byte(in), &got); err != nil {
 		t.Fatal(err)
 	}
-	if got.Text == nil || got.Highlights != nil || got.Summary == nil || got.Context == nil || got.Livecrawl != LivecrawlNever {
+	if got.Text == nil || got.Highlights == nil || got.Summary == nil || got.Context == nil || got.Livecrawl != LivecrawlNever {
 		t.Fatalf("got = %+v", got)
 	}
 	out, err := json.Marshal(got)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(out) != `{"text":true,"summary":true,"context":true,"livecrawl":"never"}` {
+	if string(out) != in {
 		t.Errorf("round trip = %s", out)
 	}
 	var empty SearchMonitorContents

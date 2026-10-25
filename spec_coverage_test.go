@@ -357,6 +357,10 @@ func structElem(t reflect.Type) reflect.Type {
 // (e.g. "send true when empty") are still compared field by field.
 func customJSON(t reflect.Type) bool {
 	u := reflect.TypeOf((*json.Unmarshaler)(nil)).Elem()
+	b := reflect.TypeOf((*interface{ acceptsBool() })(nil)).Elem()
+	if t.Implements(b) {
+		return false // true|false|object options: fields still map onto the spec
+	}
 	return t.Implements(u) || reflect.PointerTo(t).Implements(u)
 }
 
